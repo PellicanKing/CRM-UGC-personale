@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CRM Outreach personale
 
-## Getting Started
+Web app locale (un solo utente) per revisionare aziende, generare messaggi con Claude e, nei prossimi step, programmarne l'invio.
 
-First, run the development server:
+## Avvio
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # inserisci ANTHROPIC_API_KEY
+npm run db:setup             # crea data/crm.db e carica 5 aziende di esempio
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run db:seed` azzera il database e ricarica i dati di esempio.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Email con Proton Mail
+1. Serve un piano Proton a pagamento. Meglio un indirizzo dedicato su un tuo dominio.
+2. Installa e apri **Proton Mail Bridge**, accedi, e copia dalla sua schermata utente e password SMTP/IMAP (non sono la password Proton).
+3. In `.env.local`: `EMAIL_PROVIDER=proton`, `MAIL_FROM_*`, `SMTP_*`, `IMAP_*` (vedi `.env.example`).
+4. In **Impostazioni**: *Prova connessione*, poi *Invia prova a me stesso*.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Senza Bridge puoi usare l'SMTP diretto (`smtp.protonmail.ch:587` + token, solo dominio personalizzato), ma allora le risposte non vengono rilevate.
 
-## Learn More
+## Pagine
+- **Panoramica** – conteggi per stato.
+- **Revisione** – una card per azienda: scheda, link Sito/Instagram/Facebook/Ad Library, sequenza (primo messaggio + 2 follow-up) modificabile, DM Instagram da copiare.
+  Scorciatoie: `A` / `Ctrl+Invio` approva · `E` modifica · `R` rigenera step · `G` rigenera scheda e sequenza · `D`/`X` scarta · `←→`/`K J` naviga · `1 2 3` step · `?` aiuto.
+- **Aziende** – elenco e inserimento manuale; un'azienda approvata o scartata può tornare in revisione.
+- **Impostazioni** – giorni e fasce di invio, fuso, limite giornaliero, intervallo casuale, giorni dei follow-up, firma, riga di disiscrizione (obbligatoria).
 
-To learn more about Next.js, take a look at the following resources:
+## Struttura
+- `src/db/schema.ts` – modello dati (Drizzle + SQLite)
+- `src/lib/ai.ts` – Claude: scheda azienda e sequenza (output strutturato), tono da `prompts/tono.md`
+- `src/lib/email/provider.ts` – interfaccia `EmailProvider`: `proton` (SMTP) e `console` (prova, nessun invio)
+- `src/lib/email/send.ts` – invio di un singolo messaggio, solo se approvato e se la sequenza non è stata interrotta
+- `src/lib/email/inbox.ts` – lettura IMAP: risposte, bounce e disiscrizioni fermano la sequenza
+- `src/app/actions.ts` – server actions (approva, scarta, rigenera, impostazioni)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Stato MVP
+1. ✅ Setup + database + seed
+2. ✅ Revisione a carrellata
+3. ✅ Integrazione Claude (riassunto + messaggi)
+4. ⏳ Programmazione, invio e follow-up
+5. ⏳ "Trova lead"
+6. ⏳ Statistiche
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+"Approva" registra solo l'approvazione: nulla viene inviato.
