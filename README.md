@@ -3,15 +3,17 @@
 Web app locale (un solo utente) per revisionare aziende, generare messaggi con Claude e, nei prossimi step, programmarne l'invio.
 
 ## Avvio
+**Non sai programmare?** Segui [GUIDA.md](GUIDA.md): basta un doppio clic su `AVVIA (Windows)` o `AVVIA (Mac)`.
 
+Da terminale:
 ```bash
 npm install
 cp .env.example .env.local   # inserisci ANTHROPIC_API_KEY
-npm run db:setup             # crea data/crm.db e carica 5 aziende di esempio
+npm run db:push              # crea data/crm.db (vuoto)
 npm run dev                  # http://localhost:3000
 ```
 
-`npm run db:seed` azzera il database e ricarica i dati di esempio.
+`npm run db:seed` azzera il database e carica 5 aziende **di esempio** (indirizzi finti: non attivare gli invii con queste).
 
 ## Email con Proton Mail
 1. Serve un piano Proton a pagamento. Meglio un indirizzo dedicato su un tuo dominio.
