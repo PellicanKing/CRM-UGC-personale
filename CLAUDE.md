@@ -14,8 +14,8 @@ CRM per uso esclusivamente personale (un solo utente) per trovare aziende, gener
 2. Arricchimento: lettura del sito e dei dati pubblici → scheda azienda (cosa fanno, target, punti deboli, aggancio).
 3. Generazione: primo messaggio + follow-up 1 e 2 nel tono definito in `prompts/tono.md`.
 4. Revisione a carrellata: una card per azienda (riassunto, link Instagram, link Facebook Ad Library, messaggio modificabile). Azioni: Approva / Modifica / Rigenera / Scarta. Scorciatoie da tastiera.
-5. Programmazione: giorni e fasce orarie, fuso del destinatario, limite giornaliero, intervallo casuale tra invii, spostamento manuale di un singolo invio.
-6. Follow-up: partono dopo X giorni solo se non c'è risposta; la sequenza si ferma su risposta, bounce o richiesta di disiscrizione.
+5. Programmazione: giorni e fasce orarie, fuso del destinatario, limite giornaliero, intervallo casuale tra invii, spostamento manuale di un singolo invio. Preferenza attuale: invii solo il martedì, dalle 7:30, con pausa casuale di 2–6 minuti tra un invio e l'altro (deve sembrare una persona che scrive a mano).
+6. Follow-up: partono dopo X giorni solo se non c'è risposta; la sequenza si ferma su risposta, bounce o richiesta di disiscrizione. Preferenza attuale: follow-up 1 dopo 7 giorni dal primo messaggio, follow-up 2 dopo 15 giorni dal follow-up 1 (sempre nel primo giorno di invio utile).
 
 ## Modello dati
 - companies: nome, sito, settore, città, instagram, facebook_page, ad_library_url, summary, hook, status (new/review/approved/contacted/replied/discarded)

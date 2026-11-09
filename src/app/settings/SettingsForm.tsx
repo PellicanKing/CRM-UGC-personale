@@ -35,8 +35,8 @@ export default function SettingsForm({ settings: s }: { settings: Settings }) {
         <div><label className="label">Limite giornaliero</label><input className="input" type="number" min={1} name="dailyLimit" defaultValue={s.dailyLimit} /></div>
         <div><label className="label">Intervallo min (minuti)</label><input className="input" type="number" min={1} name="minIntervalMin" defaultValue={s.minIntervalMin} /></div>
         <div><label className="label">Intervallo max (minuti)</label><input className="input" type="number" min={1} name="maxIntervalMin" defaultValue={s.maxIntervalMin} /></div>
-        <div><label className="label">Follow-up 1 dopo (giorni)</label><input className="input" type="number" min={1} name="followup1" defaultValue={s.followupDays[0] ?? 3} /></div>
-        <div><label className="label">Follow-up 2 dopo (giorni)</label><input className="input" type="number" min={1} name="followup2" defaultValue={s.followupDays[1] ?? 7} /></div>
+        <div><label className="label">Follow-up 1: giorni dopo il primo</label><input className="input" type="number" min={1} name="followup1" defaultValue={s.followupDays[0] ?? 7} /></div>
+        <div><label className="label">Follow-up 2: giorni dopo il follow-up 1</label><input className="input" type="number" min={1} name="followup2" defaultValue={s.followupDays[1] ?? 15} /></div>
       </fieldset>
 
       <fieldset className="space-y-3">
@@ -51,7 +51,7 @@ export default function SettingsForm({ settings: s }: { settings: Settings }) {
       <div className="flex items-center gap-3">
         <button className="btn btn-primary" disabled={pending}>{pending ? "Salvataggio…" : "Salva"}</button>
         {state && !state.ok && <span className="text-sm text-rose-700">{state.error}</span>}
-        {state?.ok && <span className="text-sm text-emerald-700">Salvato ✓</span>}
+        {state?.ok && <span className="text-sm text-emerald-700">Salvato ✓ (coda ricalcolata)</span>}
       </div>
     </form>
   );

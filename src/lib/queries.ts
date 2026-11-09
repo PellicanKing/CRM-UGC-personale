@@ -1,5 +1,4 @@
-import "server-only";
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Company, Contact, Message, Settings } from "@/db/schema";
 
@@ -65,4 +64,54 @@ export function statusCounts(): Record<string, number> {
     .groupBy(schema.companies.status)
     .all();
   return Object.fromEntries(rows.map((r) => [r.status, r.n]));
+}
+
+export type QueueRow = {
+  id: number;
+  step: number;
+  status: string;
+  subject: string | null;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  manualSchedule: boolean;
+  companyId: number;
+  companyName: string;
+  email: string | null;
+};
+
+function queueSelect() {
+  return db
+    .select({
+      id: schema.messages.id,
+      step: schema.messages.step,
+      status: schema.messages.status,
+      subject: schema.messages.subject,
+      scheduledAt: schema.messages.scheduledAt,
+      sentAt: schema.messages.sentAt,
+      manualSchedule: schema.messages.manualSchedule,
+      companyId: schema.companies.id,
+      companyName: schema.companies.name,
+      email: schema.contacts.email,
+    })
+    .from(schema.messages)
+    .innerJoin(schema.companies, eq(schema.companies.id, schema.messages.companyId))
+    .leftJoin(schema.contacts, eq(schema.contacts.id, schema.messages.contactId));
+}
+
+export function getQueue() {
+  const scheduled = queueSelect()
+    .where(eq(schema.messages.status, "scheduled"))
+    .orderBy(asc(schema.messages.scheduledAt))
+    .all();
+  // Approved follow-ups waiting for the previous step to be sent
+  const waiting = queueSelect()
+    .where(eq(schema.messages.status, "approved"))
+    .orderBy(asc(schema.companies.id), asc(schema.messages.step))
+    .all();
+  const sent = queueSelect()
+    .where(eq(schema.messages.status, "sent"))
+    .orderBy(desc(schema.messages.sentAt))
+    .limit(30)
+    .all();
+  return { scheduled, waiting, sent };
 }

@@ -34,7 +34,7 @@ export default function Home() {
         <h2 className="mb-2 font-medium">Stato del sistema</h2>
         <ul className="space-y-1 text-stone-600">
           <li>AI (Claude): {aiConfigured() ? <span className="text-emerald-700">configurata</span> : <span className="text-amber-700">manca ANTHROPIC_API_KEY in .env.local</span>}</li>
-          <li>Invio email: <span className="text-stone-500">{process.env.EMAIL_PROVIDER === "proton" ? "Proton Mail" : "modalità prova (console)"} · programmazione non ancora attiva</span></li>
+          <li>Invio email: <span className="text-stone-500">{process.env.EMAIL_PROVIDER === "proton" ? "Proton Mail" : "modalità prova (console)"}</span></li>
         </ul>
       </div>
     </div>

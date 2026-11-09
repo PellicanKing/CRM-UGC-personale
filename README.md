@@ -40,8 +40,15 @@ Senza Bridge puoi usare l'SMTP diretto (`smtp.protonmail.ch:587` + token, solo d
 1. ✅ Setup + database + seed
 2. ✅ Revisione a carrellata
 3. ✅ Integrazione Claude (riassunto + messaggi)
-4. ⏳ Programmazione, invio e follow-up
+4. ✅ Programmazione, invio e follow-up
 5. ⏳ "Trova lead"
 6. ⏳ Statistiche
 
-"Approva" registra solo l'approvazione: nulla viene inviato.
+## Programmazione
+Pagina **Programmati**: coda degli invii divisa per giorno, spostamento manuale di un singolo invio, "Ferma sequenza", interruttore **Attiva invii / Metti in pausa** (spento di default).
+- Il pianificatore gira dentro l'app (`src/instrumentation.ts` → `src/lib/scheduler/`): ogni 10 secondi legge la posta (ogni 5 min), assegna gli orari ai messaggi approvati e invia al massimo un messaggio.
+- Regole predefinite: martedì dalle 7:30 (entro le 12:00), pausa casuale 2–6 minuti, follow-up 1 dopo 7 giorni, follow-up 2 dopo 15 giorni dal follow-up 1, sempre nel primo martedì utile.
+- Invia solo mentre l'app è aperta. Se un invio salta di oltre 20 minuti, viene spostato al giorno utile successivo invece di partire a un orario strano.
+- `SCHEDULER_DISABLED=1` in `.env.local` spegne il pianificatore.
+
+"Approva" mette i messaggi in coda; partono solo con gli invii attivi.

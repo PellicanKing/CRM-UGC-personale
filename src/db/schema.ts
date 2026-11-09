@@ -89,7 +89,10 @@ export const messages = sqliteTable("messages", {
   aiDraft: text("ai_draft"),
   finalText: text("final_text"),
   status: text("status", { enum: MESSAGE_STATUSES }).notNull().default("draft"),
+  // UTC ISO timestamp
   scheduledAt: text("scheduled_at"),
+  // True when the user moved this send by hand: the planner won't touch it
+  manualSchedule: integer("manual_schedule", { mode: "boolean" }).notNull().default(false),
   sentAt: text("sent_at"),
   // RFC 5322 Message-ID of the sent email, used to match replies
   emailMessageId: text("email_message_id"),
@@ -114,17 +117,20 @@ export const settings = sqliteTable("settings", {
   sendDays: text("send_days", { mode: "json" })
     .$type<number[]>()
     .notNull()
-    .default(sql`'[1,2,3,4,5]'`),
-  windowStart: text("window_start").notNull().default("09:00"),
-  windowEnd: text("window_end").notNull().default("17:00"),
+    .default(sql`'[2]'`),
+  windowStart: text("window_start").notNull().default("07:30"),
+  windowEnd: text("window_end").notNull().default("12:00"),
   timezone: text("timezone").notNull().default("Europe/Rome"),
   dailyLimit: integer("daily_limit").notNull().default(20),
-  minIntervalMin: integer("min_interval_min").notNull().default(4),
-  maxIntervalMin: integer("max_interval_min").notNull().default(12),
+  minIntervalMin: integer("min_interval_min").notNull().default(2),
+  maxIntervalMin: integer("max_interval_min").notNull().default(6),
+  // Days to wait after the previous message of the sequence was sent
   followupDays: text("followup_days", { mode: "json" })
     .$type<number[]>()
     .notNull()
-    .default(sql`'[3,7]'`),
+    .default(sql`'[7,15]'`),
+  // Global switch: the scheduler sends nothing while this is off
+  sendingEnabled: integer("sending_enabled", { mode: "boolean" }).notNull().default(false),
   signature: text("signature").notNull().default(""),
   unsubscribeText: text("unsubscribe_text")
     .notNull()

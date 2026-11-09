@@ -1,4 +1,3 @@
-import "server-only";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getSettings } from "@/lib/queries";

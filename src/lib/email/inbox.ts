@@ -1,4 +1,3 @@
-import "server-only";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { ImapFlow } from "imapflow";
 import { simpleParser, type AddressObject } from "mailparser";

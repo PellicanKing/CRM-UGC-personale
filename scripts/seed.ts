@@ -161,7 +161,7 @@ function main() {
   db.delete(schema.settings).run();
 
   db.insert(schema.settings).values({ id: 1, signature: "Il tuo nome\nIl tuo ruolo · tuosito.it" }).run();
-  db.insert(schema.sequences).values({ name: "Standard", steps: [0, 3, 7] }).run();
+  db.insert(schema.sequences).values({ name: "Standard", steps: [0, 7, 15] }).run();
 
   for (const item of data) {
     const company = db

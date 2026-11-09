@@ -8,6 +8,7 @@ import { buildProfile, generateSequence, regenerateStep } from "@/lib/ai";
 import { adLibraryUrl } from "@/lib/links";
 import { companyMessages, primaryContact } from "@/lib/queries";
 import { fetchSiteText } from "@/lib/site";
+import { planSchedule, replanAll } from "@/lib/scheduler/plan";
 
 export type ActionResult = { ok: true } | { ok: false, error: string };
 
@@ -68,6 +69,7 @@ export async function approveCompany(companyId: number, edits: Edit[]): Promise<
         .where(eq(schema.companies.id, companyId))
         .run();
     });
+    planSchedule();
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
@@ -291,7 +293,8 @@ export async function updateSettings(_: ActionResult | null, form: FormData): Pr
       })
       .where(eq(schema.settings.id, 1))
       .run();
-    revalidatePath("/settings");
+    replanAll();
+    revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
     if (e instanceof z.ZodError) return { ok: false, error: e.issues[0]?.message ?? "Dati non validi" };
@@ -348,6 +351,49 @@ export async function runInboxCheck(): Promise<ActionResult & { detail?: string 
       ok: true,
       detail: `${r.scanned} email lette · ${r.replied} risposte · ${r.bounced} bounce · ${r.unsubscribed} disiscrizioni`,
     };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ---------- Scheduling ----------
+
+export async function setSendingEnabled(enabled: boolean): Promise<ActionResult> {
+  try {
+    db.update(schema.settings).set({ sendingEnabled: enabled }).where(eq(schema.settings.id, 1)).run();
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function replanQueue(): Promise<ActionResult & { detail?: string }> {
+  try {
+    const n = replanAll();
+    revalidatePath("/", "layout");
+    return { ok: true, detail: `${n} invii riprogrammati` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Manual move of a single send. `local` is "YYYY-MM-DDTHH:mm" in the sending timezone. */
+export async function rescheduleMessage(messageId: number, local: string): Promise<ActionResult> {
+  const { DateTime } = await import("luxon");
+  const { getSettings } = await import("@/lib/queries");
+  try {
+    const msg = db.select().from(schema.messages).where(eq(schema.messages.id, messageId)).get();
+    if (!msg || msg.status !== "scheduled") throw new Error("Si possono spostare solo invii programmati");
+    const t = DateTime.fromISO(local, { zone: getSettings().timezone });
+    if (!t.isValid) throw new Error("Data non valida");
+    if (t < DateTime.now().plus({ minutes: 1 })) throw new Error("Scegli un orario futuro");
+    db.update(schema.messages)
+      .set({ scheduledAt: t.toUTC().toISO(), manualSchedule: true })
+      .where(eq(schema.messages.id, messageId))
+      .run();
+    revalidatePath("/scheduled");
+    return { ok: true };
   } catch (e) {
     return fail(e);
   }
