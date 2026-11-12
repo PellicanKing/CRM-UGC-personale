@@ -24,15 +24,18 @@ npm run dev                  # http://localhost:3000
 Senza Bridge puoi usare l'SMTP diretto (`smtp.protonmail.ch:587` + token, solo dominio personalizzato), ma allora le risposte non vengono rilevate.
 
 ## Pagine
-- **Panoramica** – conteggi per stato.
-- **Revisione** – una card per azienda: scheda, link Sito/Instagram/Facebook/Ad Library, sequenza (primo messaggio + 2 follow-up) modificabile, DM Instagram da copiare.
-  Scorciatoie: `A` / `Ctrl+Invio` approva · `E` modifica · `R` rigenera step · `G` rigenera scheda e sequenza · `D`/`X` scarta · `←→`/`K J` naviga · `1 2 3` step · `?` aiuto.
-- **Aziende** – elenco e inserimento manuale; un'azienda approvata o scartata può tornare in revisione.
-- **Impostazioni** – giorni e fasce di invio, fuso, limite giornaliero, intervallo casuale, giorni dei follow-up, firma, riga di disiscrizione (obbligatoria).
+- **Lista** – scrivi alcune aziende di partenza: l'AI cerca sul web i loro dati e aggiunge aziende simili. Rivedi, correggi le email, scarta, poi **Passa alla scrittura**.
+- **Scrittura** – una card per azienda con bozza pronta (template + parte personalizzata dall'AI). A ogni cambio di card si aprono 3 schede: Instagram/TikTok, Ad Library, sito.
+  Scorciatoie: `A` / `Ctrl+Invio` approva · `E` modifica · `R` rigenera step · `G` rigenera tutto · `D`/`X` scarta · `O` apri le 3 pagine · `←→`/`K J` naviga · `1 2 3` step · `?` aiuto.
+- **Programmati** – coda degli invii, spostamento manuale, pausa/attivazione.
+- **Aziende** – elenco completo e inserimento manuale.
+- **Impostazioni** – email (Proton), template, "il tuo stile" imparato dall'AI, giorni e orari di invio, firma, disiscrizione.
 
 ## Struttura
 - `src/db/schema.ts` – modello dati (Drizzle + SQLite)
-- `src/lib/ai.ts` – Claude: scheda azienda e sequenza (output strutturato), tono da `prompts/tono.md`
+- `src/lib/ai.ts` – Claude: scheda azienda, sequenza con template, apprendimento dello stile (output strutturato)
+- `src/lib/leads.ts` – ricerca aziende con Claude + ricerca web (web_search / web_fetch lato server)
+- `src/lib/generate.ts`, `src/lib/jobs.ts` – generazione bozze e lavori in background
 - `src/lib/email/provider.ts` – interfaccia `EmailProvider`: `proton` (SMTP) e `console` (prova, nessun invio)
 - `src/lib/email/send.ts` – invio di un singolo messaggio, solo se approvato e se la sequenza non è stata interrotta
 - `src/lib/email/inbox.ts` – lettura IMAP: risposte, bounce e disiscrizioni fermano la sequenza
@@ -43,7 +46,7 @@ Senza Bridge puoi usare l'SMTP diretto (`smtp.protonmail.ch:587` + token, solo d
 2. ✅ Revisione a carrellata
 3. ✅ Integrazione Claude (riassunto + messaggi)
 4. ✅ Programmazione, invio e follow-up
-5. ⏳ "Trova lead"
+5. ✅ "Trova lead" (Lista)
 6. ⏳ Statistiche
 
 ## Programmazione

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { ReviewItem } from "@/lib/queries";
 import { adLibraryUrl, stepLabel } from "@/lib/links";
@@ -9,6 +10,7 @@ import {
   approveCompany,
   discardCompany,
   enrichAndGenerate,
+  getDraftJob,
   regenerateMessage,
   saveDrafts,
 } from "../actions";
@@ -38,6 +40,64 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
   const [showHelp, setShowHelp] = useState(false);
   const [pending, startTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const router = useRouter();
+  const [autoOpen, setAutoOpen] = useState(true);
+  const [popupBlocked, setPopupBlocked] = useState(false);
+  const [job, setJob] = useState<{ running: boolean; done: number; total: number; queued: number[]; current: number | null } | null>(null);
+
+  // Remember the "open pages automatically" preference
+  useEffect(() => {
+    try {
+      setAutoOpen(localStorage.getItem("crm.autoOpen") !== "0");
+    } catch {}
+  }, []);
+  const toggleAutoOpen = () =>
+    setAutoOpen((v) => {
+      try {
+        localStorage.setItem("crm.autoOpen", v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
+
+  /**
+   * Opens social profile, Ad Library and website in named tabs. Named targets
+   * let the browser reuse the same tabs for the next company when it can.
+   * Must run inside a click/keypress handler, or the popup blocker stops it.
+   */
+  const openPages = useCallback((target: ReviewItem | undefined) => {
+    if (!target) return;
+    const c = target.company;
+    const pages: [string, string | null][] = [
+      ["crm_social", c.instagram ?? c.tiktok],
+      ["crm_adlibrary", c.adLibraryUrl ?? adLibraryUrl(c.name, c.facebookPage)],
+      ["crm_sito", c.website],
+    ];
+    let blocked = false;
+    for (const [name, url] of pages) {
+      if (!url) continue;
+      const w = window.open(url, name);
+      if (!w) blocked = true;
+    }
+    setPopupBlocked(blocked);
+  }, []);
+
+  // Poll the background draft job while companies are waiting for drafts
+  const waitingDrafts = items.some((i) => i.messages.length === 0);
+  useEffect(() => {
+    if (!waitingDrafts) return;
+    let last = -1;
+    const tick = async () => {
+      const j = await getDraftJob();
+      setJob(j);
+      if (j.done !== last) {
+        last = j.done;
+        router.refresh();
+      }
+    };
+    void tick();
+    const t = setInterval(tick, 4000);
+    return () => clearInterval(t);
+  }, [waitingDrafts, router]);
 
   const safeIndex = Math.min(index, Math.max(queue.length - 1, 0));
   const item = queue[safeIndex];
@@ -99,22 +159,40 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
           await saveDrafts(id, edits);
         });
       }
-      setIndex((i) => Math.min(Math.max(i + delta, 0), Math.max(queue.length - 1, 0)));
+      const next = Math.min(Math.max(safeIndex + delta, 0), Math.max(queue.length - 1, 0));
+      if (autoOpen && next !== safeIndex) openPages(queue[next]);
+      setIndex(next);
     },
-    [item, dirtyEdits, queue.length],
+    [item, dirtyEdits, queue, safeIndex, autoOpen, openPages],
   );
 
   const approve = useCallback(() => {
     if (!item || pending || msgs.length === 0) return;
     const id = item.company.id;
-    run(() => approveCompany(id, dirtyEdits), () => setDone((s) => new Set(s).add(id)), "Approvata ✓ (nessun invio: andrà programmata)");
-  }, [item, pending, msgs.length, dirtyEdits, run]);
+    const next = queue[safeIndex + 1] ?? queue[safeIndex - 1];
+    run(
+      () => approveCompany(id, dirtyEdits),
+      () => {
+        setDone((s) => new Set(s).add(id));
+        if (autoOpen) openPages(next);
+      },
+      "Approvata ✓ (in coda per il prossimo martedì)",
+    );
+  }, [item, pending, msgs.length, dirtyEdits, run, queue, safeIndex, autoOpen, openPages]);
 
   const discard = useCallback(() => {
     if (!item || pending) return;
     const id = item.company.id;
-    run(() => discardCompany(id), () => setDone((s) => new Set(s).add(id)), "Scartata");
-  }, [item, pending, run]);
+    const next = queue[safeIndex + 1] ?? queue[safeIndex - 1];
+    run(
+      () => discardCompany(id),
+      () => {
+        setDone((s) => new Set(s).add(id));
+        if (autoOpen) openPages(next);
+      },
+      "Scartata",
+    );
+  }, [item, pending, run, queue, safeIndex, autoOpen, openPages]);
 
   const regenerate = useCallback(() => {
     if (!item || pending) return;
@@ -175,6 +253,7 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
         a: approve,
         e: edit,
         r: regenerate,
+        o: () => openPages(item),
         g: regenerateAll,
         d: discard,
         x: discard,
@@ -191,14 +270,14 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, approve, edit, regenerate, regenerateAll, discard]);
+  }, [go, approve, edit, regenerate, regenerateAll, discard, openPages, item]);
 
   if (!item) {
     return (
       <div className="card mx-auto mt-10 max-w-lg p-8 text-center">
-        <h1 className="text-lg font-semibold">Nessuna azienda da revisionare</h1>
+        <h1 className="text-lg font-semibold">Nessuna azienda da scrivere</h1>
         <p className="mt-2 text-sm text-stone-600">
-          Aggiungi aziende dalla pagina <Link className="text-emerald-700 underline" href="/companies">Aziende</Link>.
+          Crea una lista dalla pagina <Link className="text-emerald-700 underline" href="/leads">Lista</Link> e premi «Passa alla scrittura».
         </p>
       </div>
     );
@@ -212,7 +291,7 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">Revisione</h1>
+          <h1 className="text-xl font-semibold">Scrittura</h1>
           <span className="text-sm text-stone-500">
             {safeIndex + 1} / {queue.length}
           </span>
@@ -220,6 +299,11 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
         <div className="flex items-center gap-2 text-xs text-stone-500">
           <button className="btn" onClick={() => go(-1)} disabled={safeIndex === 0}>← Prec.</button>
           <button className="btn" onClick={() => go(1)} disabled={safeIndex >= queue.length - 1}>Succ. →</button>
+          <label className="flex items-center gap-1.5 text-sm text-stone-600">
+            <input type="checkbox" className="accent-emerald-700" checked={autoOpen} onChange={toggleAutoOpen} />
+            Apri pagine in automatico
+          </label>
+          <button className="btn btn-primary" onClick={() => openPages(item)}>Apri le 3 pagine <kbd className="!border-emerald-500 !bg-emerald-600 !text-emerald-50">O</kbd></button>
           <button className="btn" onClick={() => setShowHelp((s) => !s)}>Scorciatoie <kbd>?</kbd></button>
         </div>
       </div>
@@ -233,8 +317,22 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
           <span><kbd>D</kbd> / <kbd>X</kbd> Scarta</span>
           <span><kbd>←</kbd><kbd>→</kbd> / <kbd>K</kbd><kbd>J</kbd> Naviga</span>
           <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Cambia step</span>
+          <span><kbd>O</kbd> Apri social, Ad Library e sito</span>
           <span><kbd>Esc</kbd> Esci dal testo</span>
         </div>
+      )}
+
+      {popupBlocked && (
+        <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-200">
+          Il browser ha bloccato l&apos;apertura delle pagine. Clicca sull&apos;icona con la finestrella barrata nella barra degli indirizzi,
+          scegli <b>«Consenti sempre popup e reindirizzamenti da localhost»</b>, poi premi di nuovo <kbd>O</kbd>.
+        </p>
+      )}
+
+      {job?.running && waitingDrafts && (
+        <p className="rounded-md bg-sky-50 px-3 py-2 text-sm text-sky-800 ring-1 ring-sky-200">
+          L&apos;AI sta preparando le bozze: {job.done} di {job.total} pronte. Puoi iniziare a lavorare su quelle pronte.
+        </p>
       )}
 
       {!aiEnabled && (
@@ -259,6 +357,7 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
           <div className="flex flex-wrap gap-2 text-sm">
             {company.website && <ExtLink href={company.website}>Sito</ExtLink>}
             {company.instagram ? <ExtLink href={company.instagram}>Instagram</ExtLink> : <Missing>Instagram</Missing>}
+            {company.tiktok ? <ExtLink href={company.tiktok}>TikTok</ExtLink> : <Missing>TikTok</Missing>}
             {company.facebookPage ? <ExtLink href={company.facebookPage}>Facebook</ExtLink> : <Missing>Facebook</Missing>}
             <ExtLink href={adLib}>Ad Library</ExtLink>
           </div>
@@ -291,7 +390,7 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
           {company.dmText && (
             <div>
               <div className="label flex items-center justify-between">
-                <span>DM Instagram (da copiare, invio manuale)</span>
+                <span>DM Instagram/TikTok (da copiare, invio manuale)</span>
                 <CopyButton text={company.dmText} />
               </div>
               <p className="whitespace-pre-wrap rounded-lg border border-dashed border-stone-300 p-3 text-sm text-stone-700">{company.dmText}</p>
@@ -303,7 +402,11 @@ export default function ReviewDeck({ items, signature, unsubscribeText, aiEnable
         <section className="card flex flex-col p-5">
           {msgs.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-              <p className="text-sm text-stone-600">Questa azienda non ha ancora scheda né messaggi.</p>
+              <p className="text-sm text-stone-600">
+                {job && (job.queued.includes(company.id) || job.current === company.id)
+                  ? "L'AI sta preparando scheda e messaggi per questa azienda…"
+                  : "Questa azienda non ha ancora scheda né messaggi."}
+              </p>
               <button className="btn btn-primary" onClick={regenerateAll} disabled={pending || !aiEnabled}>
                 {pending ? "Generazione in corso…" : "Genera scheda e messaggi"} <kbd className="!border-emerald-500 !bg-emerald-600 !text-emerald-50">G</kbd>
               </button>

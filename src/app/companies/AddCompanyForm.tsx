@@ -9,6 +9,7 @@ const fields: { name: string; label: string; placeholder?: string; type?: string
   { name: "sector", label: "Settore" },
   { name: "city", label: "Città" },
   { name: "instagram", label: "Instagram (URL profilo)" },
+  { name: "tiktok", label: "TikTok (URL profilo)" },
   { name: "facebookPage", label: "Pagina Facebook (URL)" },
   { name: "contactName", label: "Nome contatto" },
   { name: "contactRole", label: "Ruolo" },

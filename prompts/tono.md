@@ -4,7 +4,7 @@ Modifica liberamente questo file: viene letto a ogni generazione.
 
 ## Chi scrive
 - Scrivo in prima persona, come professionista indipendente (non come agenzia).
-- Cosa offro: [descrivi qui in una riga il tuo servizio, es. "aiuto attività locali a trovare clienti con campagne Meta e contenuti social"].
+- Cosa offro: creo contenuti UGC (video brevi e spontanei per Instagram, TikTok e ads) per brand e aziende. [Modifica questa riga con la tua offerta precisa.]
 
 ## Stile
 - Italiano naturale, dare del "tu" salvo realtà molto formali (studi legali, notai): lì "Lei".
@@ -23,3 +23,4 @@ Modifica liberamente questo file: viene letto a ogni generazione.
 - Inventare dati, clienti o risultati.
 - Criticare l'azienda in modo diretto: i "punti deboli" diventano opportunità.
 - Inserire link nel primo messaggio.
+- Lasciare parentesi quadre o segnaposto nel testo.

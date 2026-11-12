@@ -4,22 +4,17 @@ import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { buildProfile, generateSequence, regenerateStep } from "@/lib/ai";
+import { DEFAULT_TEMPLATES } from "@/lib/ai";
+import { generateForCompany, maybeLearnStyle, regenerateMessageText } from "@/lib/generate";
+import { draftJobStatus, enqueueDrafts, startLeadSearch } from "@/lib/jobs";
 import { adLibraryUrl } from "@/lib/links";
 import { companyMessages, primaryContact } from "@/lib/queries";
-import { fetchSiteText } from "@/lib/site";
 import { planSchedule, replanAll } from "@/lib/scheduler/plan";
 
 export type ActionResult = { ok: true } | { ok: false, error: string };
 
 function fail(e: unknown): ActionResult {
   return { ok: false, error: e instanceof Error ? e.message : String(e) };
-}
-
-function getCompany(id: number) {
-  const company = db.select().from(schema.companies).where(eq(schema.companies.id, id)).get();
-  if (!company) throw new Error("Azienda non trovata");
-  return company;
 }
 
 const EditSchema = z.object({
@@ -58,6 +53,10 @@ export async function approveCompany(companyId: number, edits: Edit[]): Promise<
     const msgs = companyMessages(companyId);
     if (msgs.length === 0) throw new Error("Nessun messaggio da approvare");
     if (!primaryContact(companyId)?.email) throw new Error("Manca l'email del contatto");
+    const finalTexts = msgs.map((m) => edits.find((e) => e.id === m.id)?.text ?? m.finalText ?? "");
+    if (finalTexts.some((t) => /\{\{|\}\}/.test(t))) {
+      throw new Error("Nel testo è rimasto un segnaposto {{…}}: correggilo prima di approvare");
+    }
     db.transaction(() => {
       applyEdits(companyId, edits);
       db.update(schema.messages)
@@ -70,6 +69,8 @@ export async function approveCompany(companyId: number, edits: Edit[]): Promise<
         .run();
     });
     planSchedule();
+    // Learn from the user's edits in the background (every few edited emails)
+    void maybeLearnStyle().catch((e) => console.error("[style]", e));
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
@@ -132,70 +133,18 @@ export async function regenerateMessage(
   instruction?: string,
 ): Promise<ActionResult & { subject?: string; text?: string }> {
   try {
-    const msg = db.select().from(schema.messages).where(eq(schema.messages.id, messageId)).get();
-    if (!msg) throw new Error("Messaggio non trovato");
-    const company = getCompany(msg.companyId);
-    const all = companyMessages(company.id).map((m) => ({ subject: m.subject, text: m.finalText }));
-    const out = await regenerateStep(company, primaryContact(company.id), msg.step, all, instruction);
-    db.update(schema.messages)
-      .set({ subject: out.subject, aiDraft: out.body, finalText: out.body, status: "draft" })
-      .where(eq(schema.messages.id, messageId))
-      .run();
+    const out = await regenerateMessageText(messageId, instruction);
     revalidatePath("/review");
-    return { ok: true, subject: out.subject, text: out.body };
+    return { ok: true, ...out };
   } catch (e) {
     return fail(e);
   }
 }
 
 /** Reads the website, builds the profile and generates the full sequence. */
-export async function enrichAndGenerate(
-  companyId: number,
-  instruction?: string,
-): Promise<ActionResult> {
+export async function enrichAndGenerate(companyId: number, instruction?: string): Promise<ActionResult> {
   try {
-    let company = getCompany(companyId);
-    const siteText = company.website ? await fetchSiteText(company.website) : null;
-    const profile = await buildProfile(company, siteText);
-    company = db
-      .update(schema.companies)
-      .set({ ...profile })
-      .where(eq(schema.companies.id, companyId))
-      .returning()
-      .get();
-
-    const contact = primaryContact(companyId);
-    const seq = await generateSequence(company, contact, instruction);
-    const steps = [seq.first, seq.followup1, seq.followup2];
-
-    db.transaction(() => {
-      // Replace only unsent drafts; never touch sent/scheduled messages
-      db.delete(schema.messages)
-        .where(
-          and(
-            eq(schema.messages.companyId, companyId),
-            inArray(schema.messages.status, ["draft", "approved", "cancelled"]),
-          ),
-        )
-        .run();
-      steps.forEach((m, step) =>
-        db.insert(schema.messages)
-          .values({
-            companyId,
-            contactId: contact?.id ?? null,
-            step,
-            subject: m.subject,
-            aiDraft: m.body,
-            finalText: m.body,
-            status: "draft",
-          })
-          .run(),
-      );
-      db.update(schema.companies)
-        .set({ dmText: seq.instagram_dm, status: "review" })
-        .where(eq(schema.companies.id, companyId))
-        .run();
-    });
+    await generateForCompany(companyId, instruction);
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
@@ -209,6 +158,7 @@ const CompanyFormSchema = z.object({
   sector: z.string().trim().optional(),
   city: z.string().trim().optional(),
   instagram: z.string().trim().optional(),
+  tiktok: z.string().trim().optional(),
   facebookPage: z.string().trim().optional(),
   contactName: z.string().trim().optional(),
   contactRole: z.string().trim().optional(),
@@ -230,7 +180,9 @@ export async function addCompany(_: ActionResult | null, form: FormData): Promis
           sector: orNull(d.sector),
           city: orNull(d.city),
           instagram: orNull(d.instagram),
+          tiktok: orNull(d.tiktok),
           facebookPage: orNull(d.facebookPage),
+          origin: "utente",
           adLibraryUrl: adLibraryUrl(d.name, d.facebookPage),
           status: "new",
         })
@@ -394,6 +346,116 @@ export async function rescheduleMessage(messageId: number, local: string): Promi
       .run();
     revalidatePath("/scheduled");
     return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ---------- Lead list ----------
+
+const SearchSchema = z.object({
+  seeds: z.string().trim().min(3, "Scrivi almeno un'azienda di partenza"),
+  notes: z.string().trim().optional(),
+  count: z.coerce.number().int().min(1).max(30),
+});
+
+export async function createLeadSearch(_: ActionResult | null, form: FormData): Promise<ActionResult> {
+  try {
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error("Prima collega l'AI (ANTHROPIC_API_KEY con CONFIGURA)");
+    const d = SearchSchema.parse(Object.fromEntries(form));
+    const search = db
+      .insert(schema.leadSearches)
+      .values({ seeds: d.seeds, notes: d.notes || null, count: d.count })
+      .returning()
+      .get();
+    startLeadSearch(search.id);
+    revalidatePath("/leads");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof z.ZodError) return { ok: false, error: e.issues[0]?.message ?? "Dati non validi" };
+    return fail(e);
+  }
+}
+
+export async function updateLeadEmail(companyId: number, email: string): Promise<ActionResult> {
+  try {
+    const value = email.trim().toLowerCase();
+    if (value && !z.email().safeParse(value).success) throw new Error("Email non valida");
+    const contact = primaryContact(companyId);
+    if (contact) {
+      db.update(schema.contacts).set({ email: value || null }).where(eq(schema.contacts.id, contact.id)).run();
+    } else if (value) {
+      db.insert(schema.contacts).values({ companyId, email: value, source: "manuale" }).run();
+    }
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function discardLeads(ids: number[]): Promise<ActionResult> {
+  try {
+    db.update(schema.companies)
+      .set({ status: "discarded" })
+      .where(and(inArray(schema.companies.id, ids), eq(schema.companies.status, "lead")))
+      .run();
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Moves the chosen leads to writing mode and prepares their drafts in the background. */
+export async function startWriting(ids: number[]): Promise<ActionResult> {
+  try {
+    if (ids.length === 0) throw new Error("Seleziona almeno un'azienda");
+    db.update(schema.companies)
+      .set({ status: "new" })
+      .where(and(inArray(schema.companies.id, ids), eq(schema.companies.status, "lead")))
+      .run();
+    if (process.env.ANTHROPIC_API_KEY) enqueueDrafts(ids);
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function getDraftJob() {
+  return draftJobStatus();
+}
+
+// ---------- Templates and learned style ----------
+
+export async function updateWriting(_: ActionResult | null, form: FormData): Promise<ActionResult> {
+  try {
+    const templates = [0, 1, 2].map((i) => String(form.get(`template${i}`) ?? "").replace(/\r\n/g, "\n"));
+    const unknown = templates.join(" ").match(/\{\{(?!nome\}\}|azienda\}\}|personalizzazione\}\})[^}]*\}\}/);
+    if (unknown) throw new Error(`Segnaposto sconosciuto: ${unknown[0]}`);
+    const learnedStyle = String(form.get("learnedStyle") ?? "").trim();
+    db.update(schema.settings)
+      .set({ templates, learnedStyle: learnedStyle || null })
+      .where(eq(schema.settings.id, 1))
+      .run();
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function resetTemplates(): Promise<ActionResult> {
+  db.update(schema.settings).set({ templates: DEFAULT_TEMPLATES }).where(eq(schema.settings.id, 1)).run();
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function learnStyleNow(): Promise<ActionResult & { detail?: string }> {
+  try {
+    const r = await maybeLearnStyle(true);
+    revalidatePath("/settings");
+    return { ok: true, detail: r.learned ? "Stile aggiornato" : "Nessuna nuova correzione da cui imparare" };
   } catch (e) {
     return fail(e);
   }

@@ -10,23 +10,24 @@ CRM per uso esclusivamente personale (un solo utente) per trovare aziende, gener
 - Chiavi e segreti solo in `.env.local`, mai nel codice e mai committati.
 
 ## Flusso principale
-1. "Trova lead": l'utente inserisce un criterio (settore + zona) → l'agente trova aziende, sito, email, Instagram, pagina Facebook.
-2. Arricchimento: lettura del sito e dei dati pubblici → scheda azienda (cosa fanno, target, punti deboli, aggancio).
-3. Generazione: primo messaggio + follow-up 1 e 2 nel tono definito in `prompts/tono.md`.
-4. Revisione a carrellata: una card per azienda (riassunto, link Instagram, link Facebook Ad Library, messaggio modificabile). Azioni: Approva / Modifica / Rigenera / Scarta. Scorciatoie da tastiera.
+1. Lista ("Trova lead"): l'utente scrive alcune aziende a cui vorrebbe scrivere (nome, sito o profilo) → l'AI (Claude con ricerca web) le completa e aggiunge aziende simili, con sito, email pubblica, Instagram, TikTok, pagina Facebook e il motivo della scelta. L'utente rivede la lista, corregge le email, scarta quelle che non vuole e preme "Passa alla scrittura".
+2. Arricchimento e generazione in background: lettura del sito → scheda azienda (cosa fanno, target, punti deboli, aggancio) → primo messaggio + follow-up 1 e 2. Le email partono da template fissi dell'utente (segnaposto `{{nome}}`, `{{azienda}}`, `{{personalizzazione}}`); l'AI scrive solo la parte personalizzata (o l'intera email se il template è vuoto), nel tono di `prompts/tono.md`.
+3. Scrittura (revisione a carrellata): una card per azienda. A ogni cambio di card il CRM apre in automatico 3 schede: profilo Instagram (o TikTok), Facebook Ad Library e sito; la quarta è il CRM con la bozza. Azioni: Approva / Modifica / Rigenera / Scarta. Scorciatoie da tastiera.
+4. Apprendimento dello stile: ogni 3 email corrette e approvate l'AI confronta bozza e versione finale e aggiorna le note "Il tuo stile" (modificabili in Impostazioni); le ultime correzioni sono usate come esempi nelle generazioni successive.
 5. Programmazione: giorni e fasce orarie, fuso del destinatario, limite giornaliero, intervallo casuale tra invii, spostamento manuale di un singolo invio. Preferenza attuale: invii solo il martedì, dalle 7:30, con pausa casuale di 2–6 minuti tra un invio e l'altro (deve sembrare una persona che scrive a mano).
-6. Follow-up: partono dopo X giorni solo se non c'è risposta; la sequenza si ferma su risposta, bounce o richiesta di disiscrizione. Preferenza attuale: follow-up 1 dopo 7 giorni dal primo messaggio, follow-up 2 dopo 15 giorni dal follow-up 1 (sempre nel primo giorno di invio utile).
+6. Follow-up: partono dopo X giorni solo se non c'è risposta (il CRM legge la posta via IMAP); la sequenza si ferma su risposta, bounce o richiesta di disiscrizione. Preferenza attuale: follow-up 1 dopo 7 giorni dal primo messaggio, follow-up 2 dopo 15 giorni dal follow-up 1 (sempre nel primo giorno di invio utile).
 
 ## Modello dati
-- companies: nome, sito, settore, città, instagram, facebook_page, ad_library_url, summary, hook, status (new/review/approved/contacted/replied/discarded)
+- companies: nome, sito, settore, città, instagram, tiktok, facebook_page, ad_library_url, summary, hook, origin (utente/ai), lead_reason, search_id, status (lead/new/review/approved/contacted/replied/discarded)
+- lead_searches: aziende di partenza, note, quantità, stato (running/done/error), trovate
 - contacts: company_id, nome, ruolo, email, email_verified, source
 - sequences: nome, steps (giorni di attesa per ogni step)
 - messages: company_id, contact_id, step, ai_draft, final_text, subject, status (draft/approved/scheduled/sent/cancelled), scheduled_at, sent_at
 - events: message_id, tipo (sent/opened/replied/bounced/unsubscribed), timestamp
-- settings: fasce orarie, limite giornaliero, intervallo min/max, firma
+- settings: fasce orarie, limite giornaliero, intervallo min/max, firma, template (3 step), stile imparato
 
 ## Vincoli
-- Instagram: nessuno scraping e nessun invio automatico di DM. Solo link al profilo e, per i DM, messaggio pronto da copiare.
+- Instagram/TikTok: nessuno scraping e nessun invio automatico di DM. Solo link al profilo (trovato con la ricerca web) e, per i DM, messaggio pronto da copiare.
 - Facebook Ad Library: link diretto filtrato sulla pagina dell'azienda (non incorporabile in iframe).
 - Ogni email include un modo semplice per non ricevere altri messaggi.
 - Mai inviare nulla senza approvazione esplicita dell'utente.

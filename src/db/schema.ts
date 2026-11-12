@@ -7,6 +7,7 @@ const createdAt = () =>
     .default(sql`(CURRENT_TIMESTAMP)`);
 
 export const COMPANY_STATUSES = [
+  "lead",
   "new",
   "review",
   "approved",
@@ -41,6 +42,7 @@ export const companies = sqliteTable("companies", {
   sector: text("sector"),
   city: text("city"),
   instagram: text("instagram"),
+  tiktok: text("tiktok"),
   facebookPage: text("facebook_page"),
   adLibraryUrl: text("ad_library_url"),
   summary: text("summary"),
@@ -50,6 +52,24 @@ export const companies = sqliteTable("companies", {
   // Ready-to-copy Instagram DM (never sent automatically)
   dmText: text("dm_text"),
   status: text("status", { enum: COMPANY_STATUSES }).notNull().default("new"),
+  // "utente" = given by the user, "ai" = found by the lead search
+  origin: text("origin"),
+  // Why the AI thinks this company is similar / a good fit
+  leadReason: text("lead_reason"),
+  searchId: integer("search_id"),
+  createdAt: createdAt(),
+});
+
+export const LEAD_SEARCH_STATUSES = ["running", "done", "error"] as const;
+
+export const leadSearches = sqliteTable("lead_searches", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  seeds: text("seeds").notNull(),
+  notes: text("notes"),
+  count: integer("count").notNull(),
+  status: text("status", { enum: LEAD_SEARCH_STATUSES }).notNull().default("running"),
+  error: text("error"),
+  found: integer("found").notNull().default(0),
   createdAt: createdAt(),
 });
 
@@ -132,6 +152,12 @@ export const settings = sqliteTable("settings", {
   // Global switch: the scheduler sends nothing while this is off
   sendingEnabled: integer("sending_enabled", { mode: "boolean" }).notNull().default(false),
   signature: text("signature").notNull().default(""),
+  // Email templates per step (null = built-in default). Placeholders: {{nome}}, {{azienda}}, {{personalizzazione}}
+  templates: text("templates", { mode: "json" }).$type<string[]>(),
+  // Writing style learned from the user's edits
+  learnedStyle: text("learned_style"),
+  // Highest message id already used to learn the style
+  styleLastMessageId: integer("style_last_message_id"),
   unsubscribeText: text("unsubscribe_text")
     .notNull()
     .default(
@@ -143,3 +169,4 @@ export type Company = typeof companies.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
+export type LeadSearch = typeof leadSearches.$inferSelect;

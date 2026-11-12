@@ -115,3 +115,17 @@ export function getQueue() {
     .all();
   return { scheduled, waiting, sent };
 }
+
+export function getLeadSearches() {
+  return db.select().from(schema.leadSearches).orderBy(desc(schema.leadSearches.id)).limit(10).all();
+}
+
+export function getLeads() {
+  const list = db
+    .select()
+    .from(schema.companies)
+    .where(eq(schema.companies.status, "lead"))
+    .orderBy(desc(schema.companies.searchId), asc(schema.companies.id))
+    .all();
+  return list.map((company) => ({ company, contact: primaryContact(company.id) }));
+}

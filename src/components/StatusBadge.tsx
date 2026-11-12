@@ -1,4 +1,5 @@
 const styles: Record<string, string> = {
+  lead: "bg-violet-50 text-violet-700 ring-violet-200",
   new: "bg-sky-50 text-sky-700 ring-sky-200",
   review: "bg-amber-50 text-amber-800 ring-amber-200",
   approved: "bg-emerald-50 text-emerald-700 ring-emerald-200",
@@ -8,7 +9,8 @@ const styles: Record<string, string> = {
 };
 
 export const statusLabels: Record<string, string> = {
-  new: "Nuova",
+  lead: "In lista",
+  new: "Da scrivere",
   review: "Da revisionare",
   approved: "Approvata",
   contacted: "Contattata",
