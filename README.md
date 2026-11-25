@@ -33,6 +33,7 @@ Senza Bridge puoi usare l'SMTP diretto (`smtp.protonmail.ch:587` + token, solo d
 
 ## Struttura
 - `src/db/schema.ts` – modello dati (Drizzle + SQLite)
+- `vendor/better-sqlite3/` – sostituto di better-sqlite3 basato sul SQLite integrato in Node.js (`node:sqlite`): niente compilazione, serve Node >= 22.13
 - `src/lib/ai.ts` – Claude: scheda azienda, sequenza con template, apprendimento dello stile (output strutturato)
 - `src/lib/leads.ts` – ricerca aziende con Claude + ricerca web (web_search / web_fetch lato server)
 - `src/lib/generate.ts`, `src/lib/jobs.ts` – generazione bozze e lavori in background

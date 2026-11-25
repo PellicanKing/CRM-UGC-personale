@@ -1,0 +1,8 @@
+{
+  "name": "better-sqlite3",
+  "version": "13.0.3",
+  "description": "Minimal better-sqlite3-compatible wrapper around Node's built-in node:sqlite (no native build needed).",
+  "main": "index.js",
+  "license": "MIT",
+  "engines": { "node": ">=22.13" }
+}

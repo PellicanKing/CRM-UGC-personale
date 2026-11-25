@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "file:vendor/better-sqlite3",
     "drizzle-orm": "^0.45.4",
     "imapflow": "^2.11.0",
     "luxon": "^3.7.2",

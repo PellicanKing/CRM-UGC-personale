@@ -6,6 +6,10 @@ if ! command -v node >/dev/null 2>&1; then
   echo; echo "  Node.js non è installato. Segui la Parte 1 della guida."; echo
   read -r -p "Premi Invio per chiudere..."; exit 1
 fi
+if ! node -e "const [a,b]=process.versions.node.split('.').map(Number);process.exit(a>22||(a===22&&b>=13)?0:1)"; then
+  echo; echo "  La versione di Node.js è troppo vecchia. Installa la versione LTS da nodejs.org."; echo
+  read -r -p "Premi Invio per chiudere..."; exit 1
+fi
 [ -f .env.local ] || cp .env.example .env.local
 echo; echo "  Preparazione in corso... (la prima volta può richiedere alcuni minuti)"; echo
 if ! (npm install --no-audit --no-fund && npm run db:push && npm run build); then

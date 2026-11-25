@@ -4,7 +4,7 @@ CRM per uso esclusivamente personale (un solo utente) per trovare aziende, gener
 
 ## Stack
 - Next.js (App Router) + TypeScript + Tailwind
-- SQLite con Drizzle ORM (file locale `data/crm.db`)
+- SQLite con Drizzle ORM (file locale `data/crm.db`). Il database usa il SQLite integrato in Node.js (`node:sqlite`, Node >= 22.13) tramite il pacchetto locale `vendor/better-sqlite3`, compatibile con l'API di better-sqlite3: nessun modulo nativo da compilare (niente Visual Studio su Windows).
 - Claude API (`@anthropic-ai/sdk`) per riassunti e messaggi
 - Invio email: Proton Mail. Invio via SMTP (Proton Mail Bridge su `127.0.0.1:1025`, oppure SMTP submission `smtp.protonmail.ch:587` con token per dominio personalizzato); rilevamento di risposte, bounce e disiscrizioni via IMAP del Bridge (`127.0.0.1:1143`). Usare un indirizzo dedicato su dominio proprio e volumi bassi. Tutto dietro l'interfaccia `EmailProvider` (`src/lib/email/`) per poter cambiare; provider `console` per le prove senza invio.
 - Chiavi e segreti solo in `.env.local`, mai nel codice e mai committati.

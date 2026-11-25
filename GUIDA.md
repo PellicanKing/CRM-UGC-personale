@@ -148,7 +148,8 @@ Se il computer era spento, gli invii saltati si spostano **al martedì successiv
 
 | Cosa vedi | Cosa fare |
 |---|---|
-| "Node.js non è installato" | Rifai la Parte 1 e riavvia il computer. |
+| "Node.js non è installato" o "versione troppo vecchia" | Rifai la Parte 1 e riavvia il computer. |
+| Errore con `gyp` o "Visual Studio" | Hai una versione vecchia del CRM: elimina la cartella, scarica di nuovo lo ZIP (Parte 2) e riprova. Non serve installare Visual Studio. |
 | "Impossibile raggiungere il sito" | Riapri **AVVIA** e aspetta "Il CRM è acceso". |
 | Il pulsante "Crea la lista" è grigio | Manca la chiave dell'AI: rifai la Parte 4. |
 | La ricerca dà errore "Interrotta" | Hai chiuso la finestra nera durante la ricerca: rifalla. |

@@ -10,6 +10,14 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+node -e "const [a,b]=process.versions.node.split('.').map(Number);process.exit(a>22||(a===22&&b>=13)?0:1)"
+if errorlevel 1 (
+  echo.
+  echo  La versione di Node.js e' troppo vecchia. Installa la versione LTS da nodejs.org.
+  echo.
+  pause
+  exit /b 1
+)
 if not exist .env.local copy .env.example .env.local >nul
 echo.
 echo  Preparazione in corso... (la prima volta puo' richiedere alcuni minuti)
